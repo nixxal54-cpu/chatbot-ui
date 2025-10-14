@@ -1,46 +1,27 @@
-import { createClient } from "@/lib/supabase/middleware"
-import { i18nRouter } from "next-i18n-router"
-import { NextResponse, type NextRequest } from "next/server"
-import i18nConfig from "./i18nConfig"
+import { i18nRouter } from "next-i18n-router";
+import { NextResponse, type NextRequest } from "next/server";
+import i18nConfig from "./i18nConfig";
 
+// 🧩 Middleware that bypasses login and lets everyone access the chatbot
 export async function middleware(request: NextRequest) {
-  const i18nResult = i18nRouter(request, i18nConfig)
-  if (i18nResult) return i18nResult
+  // Keep i18n (language) working
+  const i18nResult = i18nRouter(request, i18nConfig);
+  if (i18nResult) return i18nResult;
 
-  try {
-    const { supabase, response } = createClient(request)
+  // 🚀 Skip Supabase login check completely
+  const url = request.nextUrl.clone();
 
-    const session = await supabase.auth.getSession()
-
-    const redirectToChat = session && request.nextUrl.pathname === "/"
-
-    if (redirectToChat) {
-      const { data: homeWorkspace, error } = await supabase
-        .from("workspaces")
-        .select("*")
-        .eq("user_id", session.data.session?.user.id)
-        .eq("is_home", true)
-        .single()
-
-      if (!homeWorkspace) {
-        throw new Error(error?.message)
-      }
-
-      return NextResponse.redirect(
-        new URL(`/${homeWorkspace.id}/chat`, request.url)
-      )
-    }
-
-    return response
-  } catch (e) {
-    return NextResponse.next({
-      request: {
-        headers: request.headers
-      }
-    })
+  // Optional: If user tries to open /login, redirect them to the home/chat page
+  if (url.pathname === "/login") {
+    url.pathname = "/";
+    return NextResponse.redirect(url);
   }
+
+  // Allow everyone to access all routes freely
+  return NextResponse.next();
 }
 
+// Keep matcher (this decides which routes use middleware)
 export const config = {
   matcher: "/((?!api|static|.*\\..*|_next|auth).*)"
-}
+};
